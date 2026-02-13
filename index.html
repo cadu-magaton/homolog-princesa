@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Princesa | Governança 360 v6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f1f5f9; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .status-pill { padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-align: center; display: inline-block; min-width: 90px; }
+        .status-concluido { background: #065f46; color: #34d399; }
+        .status-andamento { background: #92400e; color: #fbbf24; }
+        .status-parado { background: #7f1d1d; color: #f87171; }
+        
+        .titulo-p1 { color: #f87171; font-weight: 800; text-transform: uppercase; }
+        .titulo-p2 { color: #f1f5f9; font-weight: 600; }
+        .titulo-p3 { color: #94a3b8; font-weight: 400; }
+
+        /* Estilo para Observação Expansível */
+        .obs-container { position: relative; cursor: pointer; max-width: 200px; }
+        .obs-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-style: italic; color: #64748b; font-size: 0.75rem; }
+        .obs-tooltip { 
+            visibility: hidden; position: absolute; z-index: 50; bottom: 125%; left: 0;
+            background: #1e293b; color: #fff; padding: 10px; border-radius: 8px;
+            width: 300px; border: 1px solid #3b82f6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            font-size: 0.75rem; white-space: normal; opacity: 0; transition: opacity 0.3s;
+        }
+        .obs-container:hover .obs-tooltip { visibility: visible; opacity: 1; }
+
+        input, select, textarea { background: #1e293b !important; color: white !important; border: 1px solid #3b82f6 !important; border-radius: 4px; padding: 4px 8px; width: 100%; font-size: 0.8rem; }
+        .btn-action { transition: all 0.2s; font-weight: 600; font-size: 0.7rem; padding: 4px 10px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+    <div id="loginOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
+        <div class="glass-card p-10 rounded-2xl w-full max-w-sm shadow-2xl border-t-4 border-blue-500 text-center">
+            <h1 class="text-4xl font-black text-blue-500 mb-6 tracking-tighter uppercase">Princesa</h1>
+            <form id="loginForm" class="space-y-4">
+                <input type="password" id="password" class="text-center py-3" placeholder="Senha de Acesso">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <main id="dashboardContent" class="hidden p-4 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+        <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div>
+                <h2 class="text-2xl font-black tracking-tight text-white">Governança Princesa</h2>
+                <p class="text-slate-500 text-xs italic">Logado como: Desenvolvedor Sênior</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="btnBack" class="hidden bg-slate-800 px-4 py-2 rounded-lg text-xs font-bold border border-slate-600">← Voltar</button>
+                <button onclick="exportData()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xl">💾 Exportar data.js</button>
+            </div>
+        </header>
+
+        <div id="pilarCards" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+        <div id="chartsSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="glass-card p-4 rounded-xl">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase mb-4 text-center tracking-widest">Status Geral</h3>
+                <div class="h-48 flex justify-center"><canvas id="chartStatus"></canvas></div>
+            </div>
+            <div class="glass-card p-4 rounded-xl text-center">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase mb-4 tracking-widest">Carga por Pilar</h3>
+                <div class="h-48 flex justify-center"><canvas id="chartPilar"></canvas></div>
+            </div>
+        </div>
+
+        <div class="glass-card rounded-xl overflow-hidden shadow-2xl border border-slate-800">
+            <div class="p-4 bg-slate-800/40 flex justify-between items-center">
+                <h3 id="tableTitle" class="font-bold text-blue-400">Atividades em Foco</h3>
+                <button onclick="addNewTask()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-xs font-bold transition-all">+ Nova Tarefa</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-900/50 text-slate-500 text-[9px] uppercase font-black tracking-widest border-b border-slate-800">
+                        <tr>
+                            <th class="p-3">Pilar</th>
+                            <th class="p-3">Tarefa</th>
+                            <th class="p-3">Descrição</th>
+                            <th class="p-3">Observações (Passe o Mouse)</th>
+                            <th class="p-3 text-center">Prio.</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-800"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="data.js"></script>
+    <script>
+        let currentPilar = null;
+        let editingTaskId = null;
+        let statusChart = null;
+        let pilarChart = null;
+
+      // 🔐 HASH da senha: princesa2026
+const AUTH_TOKEN = "4c1d6b6a7f2b1e4b5c0f8d3e2a6c7b9d1e2f4a5b6c7d8e9f0a1b2c3d4e5f6789";
+
+async function hashPassword(password) {
+    const msgUint8 = new TextEncoder().encode(password.trim());
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function liberarDashboard() {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('dashboardContent').classList.remove('hidden');
+    renderPilarCards();
+    updateDashboard();
+}
+
+if (sessionStorage.getItem("auth") === "true") {
+    liberarDashboard();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const senha = document.getElementById('password').value;
+    const senhaHash = await hashPassword(senha);
+
+    if (senhaHash === AUTH_TOKEN) {
+        sessionStorage.setItem("auth", "true");
+        liberarDashboard();
+    } else {
+        alert("Senha incorreta!");
+    }
+});
+
+
+        function renderPilarCards() {
+            const container = document.getElementById('pilarCards');
+            const pilares = ["Unymos", "Automações", "Operações", "Projetos"];
+            container.innerHTML = pilares.map(p => `
+                <div onclick="filterPilar('${p}')" class="glass-card p-3 rounded-lg cursor-pointer hover:border-blue-500 border border-transparent transition-all">
+                    <h4 class="text-blue-400 font-bold text-[10px] uppercase">${p}</h4>
+                </div>
+            `).join('');
+        }
+
+        function filterPilar(pilar) {
+            currentPilar = pilar;
+            editingTaskId = null; 
+            document.getElementById('btnBack').classList.remove('hidden');
+            document.getElementById('chartsSection').classList.add('hidden');
+            document.getElementById('tableTitle').innerText = `Gestão: ${pilar}`;
+            updateDashboard();
+        }
+
+        document.getElementById('btnBack').onclick = () => {
+            currentPilar = null;
+            editingTaskId = null;
+            document.getElementById('btnBack').classList.add('hidden');
+            document.getElementById('chartsSection').classList.remove('hidden');
+            document.getElementById('tableTitle').innerText = "Cronograma Completo";
+            updateDashboard();
+        };
+
+        function updateDashboard() {
+            const tasks = currentPilar 
+                ? dashboardData.tarefas.filter(t => t.pilar === currentPilar)
+                : dashboardData.tarefas;
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = tasks.map(t => {
+                const isEditing = editingTaskId === t.id;
+                let prioClass = t.prioridade === 'P1' ? "titulo-p1" : t.prioridade === 'P3' ? "titulo-p3" : "titulo-p2";
+
+                if (isEditing) {
+                    return `
+                    <tr class="bg-blue-900/10 border-l-4 border-blue-500">
+                        <td class="p-3 text-xs">
+                            <select id="edit-pilar-${t.id}">
+                                <option ${t.pilar === 'Unymos' ? 'selected' : ''}>Unymos</option>
+                                <option ${t.pilar === 'Automações' ? 'selected' : ''}>Automações</option>
+                                <option ${t.pilar === 'Operações' ? 'selected' : ''}>Operações</option>
+                                <option ${t.pilar === 'Projetos' ? 'selected' : ''}>Projetos</option>
+                            </select>
+                        </td>
+                        <td class="p-3"><input id="edit-tema-${t.id}" type="text" value="${t.tema}"></td>
+                        <td class="p-3"><input id="edit-desc-${t.id}" type="text" value="${t.desc}"></td>
+                        <td class="p-3"><textarea id="edit-obs-${t.id}" class="h-12">${t.obs || ''}</textarea></td>
+                        <td class="p-3 text-center">
+                            <select id="edit-prioridade-${t.id}">
+                                <option ${t.prioridade === 'P1' ? 'selected' : ''}>P1</option>
+                                <option ${t.prioridade === 'P2' ? 'selected' : ''}>P2</option>
+                                <option ${t.prioridade === 'P3' ? 'selected' : ''}>P3</option>
+                            </select>
+                        </td>
+                        <td class="p-3">
+                            <select id="edit-status-${t.id}">
+                                <option value="Concluído" ${t.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
+                                <option value="Em andamento" ${t.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
+                                <option value="Não iniciado" ${t.status === 'Não iniciado' ? 'selected' : ''}>Não iniciado</option>
+                            </select>
+                        </td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="saveTask(${t.id})" class="btn-action bg-green-600 text-white shadow-md">Salvar</button>
+                            <button onclick="cancelEdit()" class="btn-action bg-slate-700 text-slate-400">Sair</button>
+                        </td>
+                    </tr>`;
+                } else {
+                    return `
+                    <tr class="hover:bg-slate-800/50 transition-all border-l-4 ${t.prioridade === 'P1' ? 'border-red-500' : 'border-transparent'}">
+                        <td class="p-3 font-bold text-blue-400 text-[10px] uppercase">${t.pilar}</td>
+                        <td class="p-3 ${prioClass} text-xs">${t.tema}</td>
+                        <td class="p-3 text-slate-400 text-[10px] italic">${t.desc}</td>
+                        <td class="p-3">
+                            <div class="obs-container">
+                                <span class="obs-text">${t.obs || 'Nenhuma anotação...'}</span>
+                                ${t.obs ? `<div class="obs-tooltip"><strong>Anotação:</strong><br>${t.obs}</div>` : ''}
+                            </div>
+                        </td>
+                        <td class="p-3 text-center font-black text-[10px] text-slate-500">${t.prioridade}</td>
+                        <td class="p-3">
+                            <span class="status-pill ${getStatusClass(t.status)}">${t.status}</span>
+                        </td>
+                        <td class="p-3 text-right space-x-4">
+                            <button onclick="enableEdit(${t.id})" class="text-blue-400 text-[9px] font-black uppercase tracking-widest hover:text-blue-200">Editar</button>
+                            <button onclick="deleteTask(${t.id})" class="text-red-500/40 text-[9px] font-black uppercase tracking-widest hover:text-red-600">Remover</button>
+                        </td>
+                    </tr>`;
+                }
+            }).join('');
+
+            updateMetrics();
+            if (!currentPilar) loadCharts();
+        }
+
+        // --- FUNÇÕES DE LÓGICA ---
+        function enableEdit(id) { editingTaskId = id; updateDashboard(); }
+        function cancelEdit() { editingTaskId = null; updateDashboard(); }
+
+        function saveTask(id) {
+            const task = dashboardData.tarefas.find(t => t.id === id);
+            task.pilar = document.getElementById(`edit-pilar-${id}`).value;
+            task.tema = document.getElementById(`edit-tema-${id}`).value;
+            task.desc = document.getElementById(`edit-desc-${id}`).value;
+            task.obs = document.getElementById(`edit-obs-${id}`).value;
+            task.prioridade = document.getElementById(`edit-prioridade-${id}`).value;
+            task.status = document.getElementById(`edit-status-${id}`).value;
+            editingTaskId = null;
+            updateDashboard();
+        }
+
+        function addNewTask() {
+            const nextId = dashboardData.tarefas.length > 0 ? Math.max(...dashboardData.tarefas.map(t => t.id)) + 1 : 1;
+            dashboardData.tarefas.unshift({
+                id: nextId, pilar: currentPilar || "Unymos", tema: "", desc: "", obs: "", prioridade: "P3", status: "Não iniciado", ordem: nextId
+            });
+            editingTaskId = nextId; 
+            updateDashboard();
+        }
+
+        function deleteTask(id) {
+            if(confirm("Confirmar remoção permanente?")) {
+                dashboardData.tarefas = dashboardData.tarefas.filter(t => t.id !== id);
+                updateDashboard();
+            }
+        }
+
+        function updateMetrics() {
+            dashboardData.metrics.statusGeral.concluido = dashboardData.tarefas.filter(t => t.status === 'Concluído').length;
+            dashboardData.metrics.statusGeral.emAndamento = dashboardData.tarefas.filter(t => t.status === 'Em andamento').length;
+            dashboardData.metrics.statusGeral.naoIniciado = dashboardData.tarefas.filter(t => t.status === 'Não iniciado').length;
+        }
+
+        function getStatusClass(status) {
+            if (status === 'Concluído') return 'status-concluido';
+            if (status === 'Em andamento') return 'status-andamento';
+            return 'status-parado';
+        }
+
+        function exportData() {
+            const dataStr = "const dashboardData = " + JSON.stringify(dashboardData, null, 4) + ";";
+            const blob = new Blob([dataStr], { type: "application/javascript" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "data.js";
+            a.click();
+            alert("data.js atualizado! Substitua na sua pasta para salvar.");
+        }
+
+        function loadCharts() {
+            if (statusChart) statusChart.destroy();
+            if (pilarChart) pilarChart.destroy();
+            statusChart = new Chart(document.getElementById('chartStatus'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Concluído', 'Em andamento', 'Não iniciado'],
+                    datasets: [{
+                        data: Object.values(dashboardData.metrics.statusGeral),
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '85%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } }
+            });
+            const pilares = dashboardData.tarefas.reduce((acc, t) => { acc[t.pilar] = (acc[t.pilar] || 0) + 1; return acc; }, {});
+            pilarChart = new Chart(document.getElementById('chartPilar'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(pilares),
+                    datasets: [{ data: Object.values(pilares), backgroundColor: '#3b82f6', borderRadius: 4 }]
+                },
+                options: { scales: { y: { beginAtZero: true, grid: { color: '#1e293b' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+            });
+        }
+    </script>
+</body>
+</html>
